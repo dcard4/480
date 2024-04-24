@@ -1,120 +1,177 @@
-import psycopg2
 import tkinter as tk
 from tkinter import messagebox
+import psycopg2
+
+def show_frame(frame):
+    frame.tkraise()
 
 def create_connection():
-    """ Connect to the PostgreSQL database server """
-    conn = None
     try:
         conn = psycopg2.connect(
             host="127.0.0.1",
-            database="your_library",
-            user="postgre",
-            password="test",
-            port="5450")
+            database="project",
+            user="postgres",
+            password="Ariana1904",
+            port="5432")
         return conn
     except psycopg2.DatabaseError as e:
         messagebox.showerror("Database Connection Error", e)
         return None
 
-def add_client(conn, email, password, name):
-    """Add a new client into the Clients table"""
-    try:
-        cur = conn.cursor()
-        cur.execute("INSERT INTO Clients(email, name, password) VALUES (%s, %s, %s)", (email, name, password))
-        conn.commit()
-        cur.close()
-        messagebox.showinfo("Registration", "Registration successful")
-    except psycopg2.IntegrityError:
-        messagebox.showerror("Registration Error", "Email already registered")
-    except psycopg2.Error as e:
-        messagebox.showerror("Database Error", str(e))
-
-def check_login(conn, email, password):
-    """Check login credentials"""
-    try:
-        cur = conn.cursor()
-        cur.execute("SELECT password FROM Clients WHERE email = %s", (email,))
-        result = cur.fetchone()
-        cur.close()
-        if result and result[0] == password:
-            messagebox.showinfo("Login", "Login successful")
-        else:
-            messagebox.showerror("Login Error", "Invalid email or password")
-    except psycopg2.Error as e:
-        messagebox.showerror("Database Error", str(e))
-
-def search_document(conn, barcode):
-    """Search for a document by barcode"""
-    try:
-        cur = conn.cursor()
-        cur.execute("SELECT * FROM Documents WHERE barcode = %s", (barcode,))
-        result = cur.fetchone()
-        cur.close()
-        if result:
-            messagebox.showinfo("Search Result", f"Document Found: {result}")
-        else:
-            messagebox.showerror("Search Error", "Document not found")
-    except psycopg2.Error as e:
-        messagebox.showerror("Database Error", str(e))
-
 def register():
-    email = entry_email.get()
-    password = entry_password.get()
-    name = entry_name.get()
-    if email and password and name:
-        conn = create_connection()
-        if conn:
-            add_client(conn, email, password, name)
-            conn.close()
+    conn = create_connection()
+    if conn is None:
+        return
+    
+    role = registration_type.get()
+    if role == "Librarian":
+        add_librarian(conn, librarian_ssn.get(), librarian_name.get(), librarian_email.get(), librarian_password.get(), librarian_salary.get())
     else:
-        messagebox.showerror("Registration Error", "All fields are required")
+        add_member(conn, member_email.get(), member_password.get(), member_name.get(), member_card.get(), member_address.get())
+    conn.close()
+
+def add_librarian(conn, ssn, name, email, password, salary):
+    cur = conn.cursor()
+    try:
+        cur.execute("INSERT INTO Librarians(ssn, name, email, password, salary) VALUES (%s, %s, %s, %s, %s)",
+                    (ssn, name, email, password, salary))
+        conn.commit()
+        messagebox.showinfo("Success", "Librarian registered successfully")
+    except psycopg2.IntegrityError:
+        conn.rollback()
+        messagebox.showerror("Error", "This email or SSN is already registered")
+    finally:
+        cur.close()
+
+def add_member(conn, email, password, name, card_number, address):
+    cur = conn.cursor()
+    try:
+        # Insert into Clients
+        cur.execute("INSERT INTO Clients(email, name, password) VALUES (%s, %s, %s)",
+                    (email, name, password))
+
+        # Insert into ClientAddresses
+        cur.execute("INSERT INTO ClientAddresses(email, address) VALUES (%s, %s)",
+                    (email, address))
+
+        # Insert into CreditCards
+        cur.execute("INSERT INTO CreditCards(email, card_address, card_number) VALUES (%s, %s, %s)",
+                    (email, address, card_number))
+
+        # Commit all changes if all inserts are successful
+        conn.commit()
+        messagebox.showinfo("Success", "Member registered successfully")
+    except psycopg2.IntegrityError as e:
+        # Roll back transaction if any insert fails
+        conn.rollback()
+        if str(e).find("duplicate key value") != -1:
+            messagebox.showerror("Error", "This email is already registered or the entered details are not unique.")
+        else:
+            messagebox.showerror("Error", "An error occurred while registering the member. Please check the input data.")
+    except psycopg2.Error as e:
+        # Handle other possible exceptions such as connection errors
+        conn.rollback()
+        messagebox.showerror("Database Error", f"An unexpected database error occurred: {str(e)}")
+    finally:
+        cur.close()
+
 
 def login():
-    email = entry_email.get()
-    password = entry_password.get()
-    if email and password:
-        conn = create_connection()
-        if conn:
-            check_login(conn, email, password)
-            conn.close()
-    else:
-        messagebox.showerror("Login Error", "Both email and password are required")
+    conn = create_connection()
+    if conn is None:
+        return
 
-def search():
-    barcode = entry_barcode.get()
-    if barcode:
-        conn = create_connection()
-        if conn:
-            search_document(conn, barcode)
-            conn.close()
+    email = login_email.get()
+    password = login_password.get()
+    cur = conn.cursor()
+    cur.execute("SELECT password FROM Clients WHERE email = %s", (email,))
+    result = cur.fetchone()
+    cur.close()
+    conn.close()
+    
+    if result and result[0] == password:
+        messagebox.showinfo("Login", "Login successful")
     else:
-        messagebox.showerror("Search Error", "Barcode is required")
+        messagebox.showerror("Login", "Invalid email or password")
 
-# GUI setup
+# Main window setup
 root = tk.Tk()
 root.title("Library System")
+root.geometry('800x600')
 
-# Registration and Login
-tk.Label(root, text="Email:").grid(row=0, column=0)
-entry_email = tk.Entry(root)
-entry_email.grid(row=0, column=1)
+main_frame = tk.Frame(root)
+main_frame.pack(fill='both', expand=True)
 
-tk.Label(root, text="Password:").grid(row=1, column=0)
-entry_password = tk.Entry(root, show='*')
-entry_password.grid(row=1, column=1)
+login_frame = tk.LabelFrame(root, text="Login")
+login_frame.pack(fill='both', expand=True)
 
-tk.Label(root, text="Name (for registration only):").grid(row=2, column=0)
-entry_name = tk.Entry(root)
-entry_name.grid(row=2, column=1)
+# Login form
+tk.Label(login_frame, text="Email:").grid(row=0, column=0)
+login_email = tk.Entry(login_frame)
+login_email.grid(row=0, column=1)
 
-tk.Button(root, text="Register", command=register).grid(row=3, column=0)
-tk.Button(root, text="Login", command=login).grid(row=3, column=1)
+tk.Label(login_frame, text="Password:").grid(row=1, column=0)
+login_password = tk.Entry(login_frame, show='*')
+login_password.grid(row=1, column=1)
 
-# Document Search
-tk.Label(root, text="Search Document Barcode:").grid(row=4, column=0)
-entry_barcode = tk.Entry(root)
-entry_barcode.grid(row=4, column=1)
-tk.Button(root, text="Search", command=search).grid(row=5, column=0, columnspan=2)
+tk.Button(login_frame, text="Login", command=lambda: [create_connection(), login()]).grid(row=2, columnspan=2)
+
+# Registration type selection
+registration_type = tk.StringVar(value="Member")
+tk.Radiobutton(main_frame, text="Register as Member", variable=registration_type, value="Member", command=lambda: show_frame(member_frame)).pack()
+tk.Radiobutton(main_frame, text="Register as Librarian", variable=registration_type, value="Librarian", command=lambda: show_frame(librarian_frame)).pack()
+
+# Member registration form
+member_frame = tk.LabelFrame(root, text="Member Registration")
+member_frame.pack(fill='both', expand=True)
+
+tk.Label(member_frame, text="Email:").grid(row=0, column=0)
+member_email = tk.Entry(member_frame)
+member_email.grid(row=0, column=1)
+
+tk.Label(member_frame, text="Password:").grid(row=1, column=0)
+member_password = tk.Entry(member_frame, show='*')
+member_password.grid(row=1, column=1)
+
+tk.Label(member_frame, text="Name:").grid(row=2, column=0)
+member_name = tk.Entry(member_frame)
+member_name.grid(row=2, column=1)
+
+tk.Label(member_frame, text="Card Number:").grid(row=3, column=0)
+member_card = tk.Entry(member_frame)
+member_card.grid(row=3, column=1)
+
+tk.Label(member_frame, text="Address:").grid(row=4, column=0)
+member_address = tk.Entry(member_frame)
+member_address.grid(row=4, column=1)
+
+# Librarian registration form
+librarian_frame = tk.LabelFrame(root, text="Librarian Registration")
+librarian_frame.pack(fill='both', expand=True)
+
+tk.Label(librarian_frame, text="SSN:").grid(row=0, column=0)
+librarian_ssn = tk.Entry(librarian_frame)
+librarian_ssn.grid(row=0, column=1)
+
+tk.Label(librarian_frame, text="Name:").grid(row=1, column=0)
+librarian_name = tk.Entry(librarian_frame)
+librarian_name.grid(row=1, column=1)
+
+tk.Label(librarian_frame, text="Email:").grid(row=2, column=0)
+librarian_email = tk.Entry(librarian_frame)
+librarian_email.grid(row=2, column=1)
+
+tk.Label(librarian_frame, text="Password:").grid(row=3, column=0)
+librarian_password = tk.Entry(librarian_frame, show='*')
+librarian_password.grid(row=3, column=1)
+
+tk.Label(librarian_frame, text="Salary:").grid(row=4, column=0)
+librarian_salary = tk.Entry(librarian_frame)
+librarian_salary.grid(row=4, column=1)
+
+tk.Button(root, text="Register", command=register).pack(pady=20)
+
+# Start with main menu
+show_frame(main_frame)
 
 root.mainloop()

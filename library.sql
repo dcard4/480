@@ -6,30 +6,11 @@ CREATE TABLE Librarians (
     salary NUMERIC NOT NULL
 );
 
-
 CREATE TABLE Clients (
     email VARCHAR PRIMARY KEY,
     name VARCHAR NOT NULL,
     password VARCHAR UNIQUE NOT NULL
 );
-
-
-CREATE TABLE ClientAddresses (
-    email VARCHAR,
-    address VARCHAR,
-	FOREIGN KEY (email) REFERENCES Clients,
-	PRIMARY KEY (email, address)
-);
-
-
-CREATE TABLE CreditCards (
-    email VARCHAR,
-	address VARCHAR,
-	number INT,
-	FOREIGN KEY (email) REFERENCES Clients,
-	PRIMARY KEY (email, address, number)
-);
-
 
 CREATE TABLE Documents (
     barcode INT PRIMARY KEY,
@@ -81,6 +62,44 @@ CREATE TABLE BorrowedDocuments (
     PRIMARY KEY (email, barcode)
 );
 
+CREATE TABLE ClientAddresses (
+    email VARCHAR,
+    address VARCHAR,
+    FOREIGN KEY (email) REFERENCES Clients,
+    PRIMARY KEY (email, address)
+);
+
+CREATE TABLE CreditCards (
+    email VARCHAR,
+    card_address VARCHAR,
+    card_number INT,
+    FOREIGN KEY (email) REFERENCES Clients,
+    PRIMARY KEY (email, card_address, card_number)
+);
+
+CREATE TABLE ClientsMananaged (
+    ssn INT,
+    email VARCHAR,
+    FOREIGN KEY (ssn) REFERENCES Librarians,
+    FOREIGN KEY (email) REFERENCES Clients,
+    PRIMARY KEY (ssn, email)
+);
+
+CREATE TABLE DocumentsManaged (
+    ssn INT,
+    barcode INT,
+    FOREIGN KEY (ssn) REFERENCES Librarians,
+    FOREIGN KEY (barcode) REFERENCES Documents,
+    PRIMARY KEY (ssn, barcode)
+);
+
+CREATE TABLE Borrow (
+    email VARCHAR,
+    barcode INT,
+    FOREIGN KEY (email) REFERENCES Clients,
+    FOREIGN KEY (barcode) REFERENCES Documents,
+    PRIMARY KEY (email, barcode)
+);
 
 CREATE INDEX document_barcode ON Documents(barcode);
 CREATE INDEX client_email on Clients(email);
