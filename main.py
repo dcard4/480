@@ -1,6 +1,8 @@
 import tkinter as tk
 from tkinter import messagebox
 import psycopg2
+import librarian
+
 
 def show_frame(frame):
     frame.tkraise()
@@ -17,6 +19,17 @@ def create_connection():
     except psycopg2.DatabaseError as e:
         messagebox.showerror("Database Connection Error", e)
         return None
+
+
+
+
+def open_client_window():
+    """ Open the client window. """
+    client_window = tk.Toplevel()
+    client_window.title("Client Dashboard")
+    tk.Label(client_window, text="Welcome, Client!").pack(pady=20)
+    # Add more widgets as necessary
+    
 
 def register():
     conn = create_connection()
@@ -77,23 +90,35 @@ def add_member(conn, email, password, name, card_number, address):
 
 
 def login():
-    conn = create_connection()
-    if conn is None:
-        return
-
+    """ Handle user login by checking both librarians and clients. """
     email = login_email.get()
     password = login_password.get()
-    cur = conn.cursor()
-    cur.execute("SELECT password FROM Clients WHERE email = %s", (email,))
-    result = cur.fetchone()
-    cur.close()
-    conn.close()
-    
-    if result and result[0] == password:
-        messagebox.showinfo("Login", "Login successful")
-    else:
-        messagebox.showerror("Login", "Invalid email or password")
-
+    conn = create_connection()
+    if conn is not None:
+        cur = conn.cursor()
+        # Try to log in as a librarian first
+        cur.execute("SELECT password FROM Librarians WHERE email = %s", (email,))
+        librarian_result = cur.fetchone()
+        if librarian_result and librarian_result[0] == password:
+            messagebox.showinfo("Login", "Login successful as Librarian")
+            cur.close()
+            conn.close()
+            root.destroy()  # Destroy or hide the main login window
+            librarian.open_librarian_window()  # Start the librarian's mainloop
+            return
+        # If not a librarian, try as a client
+        cur.execute("SELECT password FROM Clients WHERE email = %s", (email,))
+        client_result = cur.fetchone()
+        if client_result and client_result[0] == password:
+            messagebox.showinfo("Login", "Login successful as Client")
+            open_client_window()
+        else:
+            messagebox.showerror("Login", "Invalid email or password")
+        cur.close()
+        conn.close()
+        
+        
+        
 # Main window setup
 root = tk.Tk()
 root.title("Library System")
