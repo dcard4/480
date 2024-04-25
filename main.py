@@ -89,7 +89,7 @@ def add_member(conn, email, password, name, card_number, address):
         cur.close()
 
 
-def login():
+def login(root):
     """ Handle user login by checking both librarians and clients. """
     email = login_email.get()
     password = login_password.get()
@@ -103,8 +103,7 @@ def login():
             messagebox.showinfo("Login", "Login successful as Librarian")
             cur.close()
             conn.close()
-            root.destroy()  # Destroy or hide the main login window
-            librarian.open_librarian_window()  # Start the librarian's mainloop
+            librarian.open_librarian_window(root)  # Modified to pass root
             return
         # If not a librarian, try as a client
         cur.execute("SELECT password FROM Clients WHERE email = %s", (email,))
@@ -139,7 +138,7 @@ tk.Label(login_frame, text="Password:").grid(row=1, column=0)
 login_password = tk.Entry(login_frame, show='*')
 login_password.grid(row=1, column=1)
 
-tk.Button(login_frame, text="Login", command=lambda: [create_connection(), login()]).grid(row=2, columnspan=2)
+tk.Button(login_frame, text="Login", command=lambda: [create_connection(), login(root)]).grid(row=2, columnspan=2)
 
 # Registration type selection
 registration_type = tk.StringVar(value="Member")
